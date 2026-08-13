@@ -19,6 +19,7 @@ class _BucketScreenState extends ConsumerState<BucketScreen> {
   final _searchController = TextEditingController();
   final _focusNode = FocusNode();
   Timer? _suggestionTimer;
+  int _suggestionGeneration = 0;
   List<String> _suggestions = const [];
   WordModel? _selectedWord;
 
@@ -32,6 +33,7 @@ class _BucketScreenState extends ConsumerState<BucketScreen> {
 
   void _onSearchChanged(String value) {
     _suggestionTimer?.cancel();
+    final request = ++_suggestionGeneration;
     if (value.trim().length < 2) {
       setState(() => _suggestions = const []);
       return;
@@ -40,15 +42,22 @@ class _BucketScreenState extends ConsumerState<BucketScreen> {
       final suggestions = await ref
           .read(wordSuggestionServiceProvider)
           .suggest(value);
-      if (!mounted || value != _searchController.text) return;
+      if (!mounted ||
+          request != _suggestionGeneration ||
+          value != _searchController.text) {
+        return;
+      }
       setState(() => _suggestions = suggestions);
     });
   }
 
   void _lookUp([String? value]) {
     final word = value ?? _searchController.text;
+    _suggestionTimer?.cancel();
+    _suggestionGeneration++;
     _searchController.text = word;
     _searchController.selection = TextSelection.collapsed(offset: word.length);
+    _focusNode.unfocus();
     setState(() {
       _suggestions = const [];
       _selectedWord = null;
