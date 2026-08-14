@@ -18,6 +18,8 @@ void main() {
     );
 
     expect(find.text('My Bucket'), findsWidgets);
+    expect(find.textContaining('Define clipboard'), findsOneWidget);
+    expect(find.textContaining('Ctrl+Shift+B'), findsOneWidget);
     expect(find.text('Search or define a word…'), findsOneWidget);
     expect(find.text('Your words'), findsOneWidget);
 

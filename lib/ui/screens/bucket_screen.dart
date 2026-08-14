@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 import '../../data/database/word_dao.dart';
 import '../../data/models/word_model.dart';
+import '../../data/services/clipboard_capture_service.dart';
 import '../../providers/word_provider.dart';
 import '../widgets/word_details.dart';
 
@@ -12,10 +14,10 @@ class BucketScreen extends ConsumerStatefulWidget {
   const BucketScreen({super.key});
 
   @override
-  ConsumerState<BucketScreen> createState() => _BucketScreenState();
+  ConsumerState<BucketScreen> createState() => BucketScreenState();
 }
 
-class _BucketScreenState extends ConsumerState<BucketScreen> {
+class BucketScreenState extends ConsumerState<BucketScreen> {
   final _searchController = TextEditingController();
   final _focusNode = FocusNode();
   Timer? _suggestionTimer;
@@ -76,6 +78,26 @@ class _BucketScreenState extends ConsumerState<BucketScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('“${saved.word}” saved to your bucket.')),
     );
+  }
+
+  Future<void> defineClipboard() async {
+    try {
+      final word = await const ClipboardCaptureService().readWord();
+      if (!mounted) return;
+      _lookUp(word);
+    } on ClipboardCaptureException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } on PlatformException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('WordBucket could not read the clipboard.'),
+        ),
+      );
+    }
   }
 
   @override
