@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme.dart';
+import '../../data/services/desktop_hotkey_service.dart';
 import 'bucket_screen.dart';
 
 class DesktopShell extends StatefulWidget {
@@ -14,7 +17,28 @@ class DesktopShell extends StatefulWidget {
 class _DesktopShellState extends State<DesktopShell> {
   int _selectedIndex = 1;
   final _bucketKey = GlobalKey<BucketScreenState>();
+  final _hotkeyService = DesktopHotkeyService();
   static const _titles = ['Progress', 'My Bucket', 'Settings'];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _registerHotkey());
+  }
+
+  Future<void> _registerHotkey() async {
+    final error = await _hotkeyService.register(onPressed: _defineClipboard);
+    if (!mounted || error == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Global shortcut unavailable: $error')),
+    );
+  }
+
+  @override
+  void dispose() {
+    unawaited(_hotkeyService.unregister());
+    super.dispose();
+  }
 
   void _defineClipboard() {
     if (_selectedIndex != 1) {

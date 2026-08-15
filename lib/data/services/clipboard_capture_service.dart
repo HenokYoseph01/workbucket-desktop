@@ -1,11 +1,45 @@
 import 'package:flutter/services.dart';
 
+typedef ClipboardTextReader = Future<String?> Function();
+
 class ClipboardCaptureService {
-  const ClipboardCaptureService();
+  ClipboardCaptureService({
+    ClipboardTextReader? reader,
+    this.retryDelays = const [
+      Duration(milliseconds: 100),
+      Duration(milliseconds: 180),
+      Duration(milliseconds: 280),
+      Duration(milliseconds: 440),
+    ],
+  }) : _reader = reader ?? _readSystemClipboard;
+
+  final ClipboardTextReader _reader;
+  final List<Duration> retryDelays;
 
   Future<String> readWord() async {
+    Object? lastPlatformError;
+    for (var attempt = 0; attempt <= retryDelays.length; attempt++) {
+      try {
+        final text = await _reader();
+        if (text != null && text.trim().isNotEmpty) {
+          return normalizeWord(text);
+        }
+      } on PlatformException catch (error) {
+        lastPlatformError = error;
+      }
+
+      if (attempt < retryDelays.length) {
+        await Future<void>.delayed(retryDelays[attempt]);
+      }
+    }
+
+    if (lastPlatformError case final PlatformException error) throw error;
+    return normalizeWord(null);
+  }
+
+  static Future<String?> _readSystemClipboard() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
-    return normalizeWord(data?.text);
+    return data?.text;
   }
 
   String normalizeWord(String? text) {

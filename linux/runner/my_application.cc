@@ -10,9 +10,26 @@
 struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
+  GtkWindow* window;
+  FlMethodChannel* activation_channel;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
+
+static void present_and_bucketify(MyApplication* self) {
+  if (self->window != nullptr) {
+    gtk_window_present(self->window);
+  }
+  if (self->activation_channel != nullptr) {
+    fl_method_channel_invoke_method(self->activation_channel, "bucketify",
+                                    nullptr, nullptr, nullptr, nullptr);
+  }
+}
+
+static void bucketify_action_cb(GSimpleAction* action, GVariant* parameter,
+                                gpointer user_data) {
+  present_and_bucketify(MY_APPLICATION(user_data));
+}
 
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
@@ -22,8 +39,15 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
+  if (self->window != nullptr) {
+    gtk_window_present(self->window);
+    return;
+  }
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
+  self->window = window;
+  g_object_add_weak_pointer(G_OBJECT(window),
+                            reinterpret_cast<gpointer*>(&self->window));
 
   // Use a header bar when running in GNOME as this is the common style used
   // by applications and is the setup most users will be using (e.g. Ubuntu
@@ -59,6 +83,11 @@ static void my_application_activate(GApplication* application) {
       project, self->dart_entrypoint_arguments);
 
   FlView* view = fl_view_new(project);
+  FlEngine* engine = fl_view_get_engine(view);
+  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  self->activation_channel = fl_method_channel_new(
+      fl_engine_get_binary_messenger(engine),
+      "com.elst.wordbucket_desktop/activation", FL_METHOD_CODEC(codec));
   GdkRGBA background_color;
   // Background defaults to black, override it here if necessary, e.g. #00000000
   // for transparent.
@@ -101,11 +130,14 @@ static gboolean my_application_local_command_line(GApplication* application,
 
 // Implements GApplication::startup.
 static void my_application_startup(GApplication* application) {
-  // MyApplication* self = MY_APPLICATION(object);
-
-  // Perform any actions required at application startup.
-
   G_APPLICATION_CLASS(my_application_parent_class)->startup(application);
+
+  g_autoptr(GSimpleAction) bucketify_action =
+      g_simple_action_new("bucketify", nullptr);
+  g_signal_connect(bucketify_action, "activate",
+                   G_CALLBACK(bucketify_action_cb), application);
+  g_action_map_add_action(G_ACTION_MAP(application),
+                          G_ACTION(bucketify_action));
 }
 
 // Implements GApplication::shutdown.
@@ -120,6 +152,7 @@ static void my_application_shutdown(GApplication* application) {
 // Implements GObject::dispose.
 static void my_application_dispose(GObject* object) {
   MyApplication* self = MY_APPLICATION(object);
+  g_clear_object(&self->activation_channel);
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
   G_OBJECT_CLASS(my_application_parent_class)->dispose(object);
 }
@@ -144,5 +177,5 @@ MyApplication* my_application_new() {
 
   return MY_APPLICATION(g_object_new(my_application_get_type(),
                                      "application-id", APPLICATION_ID, "flags",
-                                     G_APPLICATION_NON_UNIQUE, nullptr));
+                                     G_APPLICATION_DEFAULT_FLAGS, nullptr));
 }

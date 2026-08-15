@@ -71,6 +71,9 @@ class BucketScreenState extends ConsumerState<BucketScreen> {
     final saved = await ref.read(lookupProvider.notifier).save();
     if (!mounted || saved == null) return;
     _searchController.clear();
+    _suggestionTimer?.cancel();
+    _suggestionGeneration++;
+    _focusNode.unfocus();
     setState(() {
       _suggestions = const [];
       _selectedWord = saved;
@@ -81,8 +84,17 @@ class BucketScreenState extends ConsumerState<BucketScreen> {
   }
 
   Future<void> defineClipboard() async {
+    _suggestionTimer?.cancel();
+    _suggestionGeneration++;
+    _searchController.clear();
+    _focusNode.unfocus();
+    ref.read(lookupProvider.notifier).clear();
+    setState(() {
+      _suggestions = const [];
+      _selectedWord = null;
+    });
     try {
-      final word = await const ClipboardCaptureService().readWord();
+      final word = await ClipboardCaptureService().readWord();
       if (!mounted) return;
       _lookUp(word);
     } on ClipboardCaptureException catch (error) {

@@ -36,6 +36,8 @@ dependencies:
   drift: ^2.34.2
   drift_flutter: ^0.3.1
   flutter_riverpod: ^2.6.1
+  hotkey_manager: ^0.2.3
+  window_manager: ^0.5.2
 
 dev_dependencies:
   flutter_test:
