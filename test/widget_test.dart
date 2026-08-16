@@ -5,9 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wordbucket_desktop/app.dart';
 import 'package:wordbucket_desktop/data/database/database.dart';
 import 'package:wordbucket_desktop/providers/word_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   testWidgets('desktop shell opens on the bucket', (tester) async {
+    SharedPreferences.setMockInitialValues({});
     final database = AppDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     await tester.pumpWidget(

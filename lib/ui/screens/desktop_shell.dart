@@ -5,13 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
-import '../../core/theme.dart';
 import '../../data/services/desktop_hotkey_service.dart';
 import '../../data/services/clipboard_capture_service.dart';
 import '../../providers/word_provider.dart';
 import 'bucket_screen.dart';
 import 'compact_definition_screen.dart';
 import 'progress_screen.dart';
+import 'settings_screen.dart';
 
 class DesktopShell extends ConsumerStatefulWidget {
   const DesktopShell({super.key});
@@ -149,7 +149,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                           width: 42,
                           height: 42,
                           decoration: BoxDecoration(
-                            color: desktopGold,
+                            color: Theme.of(context).colorScheme.tertiary,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(Icons.local_library_rounded),
@@ -238,12 +238,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                               children: [
                                 const ProgressScreen(),
                                 BucketScreen(key: _bucketKey),
-                                const _PlaceholderPage(
-                                  icon: Icons.tune_rounded,
-                                  title: 'Desktop preferences',
-                                  message:
-                                      'Themes and shortcuts will live here.',
-                                ),
+                                const SettingsScreen(),
                               ],
                             ),
                           ),
@@ -263,34 +258,4 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
 
 class DefineClipboardIntent extends Intent {
   const DefineClipboardIntent();
-}
-
-class _PlaceholderPage extends StatelessWidget {
-  const _PlaceholderPage({
-    required this.icon,
-    required this.title,
-    required this.message,
-  });
-
-  final IconData icon;
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 52),
-            const SizedBox(height: 18),
-            Text(title, style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 10),
-            Text(message),
-          ],
-        ),
-      ),
-    );
-  }
 }

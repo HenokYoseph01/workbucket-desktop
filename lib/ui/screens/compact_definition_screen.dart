@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/theme.dart';
 import '../../providers/word_provider.dart';
 
 class CompactDefinitionScreen extends ConsumerWidget {
@@ -31,7 +30,7 @@ class CompactDefinitionScreen extends ConsumerWidget {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: desktopGold,
+                      color: Theme.of(context).colorScheme.tertiary,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.local_library_rounded, size: 20),
