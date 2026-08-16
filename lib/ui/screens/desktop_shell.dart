@@ -1,23 +1,32 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../../core/theme.dart';
 import '../../data/services/desktop_hotkey_service.dart';
+import '../../data/services/clipboard_capture_service.dart';
+import '../../providers/word_provider.dart';
 import 'bucket_screen.dart';
+import 'compact_definition_screen.dart';
+import 'progress_screen.dart';
 
-class DesktopShell extends StatefulWidget {
+class DesktopShell extends ConsumerStatefulWidget {
   const DesktopShell({super.key});
 
   @override
-  State<DesktopShell> createState() => _DesktopShellState();
+  ConsumerState<DesktopShell> createState() => _DesktopShellState();
 }
 
-class _DesktopShellState extends State<DesktopShell> {
+class _DesktopShellState extends ConsumerState<DesktopShell> {
   int _selectedIndex = 1;
   final _bucketKey = GlobalKey<BucketScreenState>();
   final _hotkeyService = DesktopHotkeyService();
+  bool _compact = false;
+  Size? _normalSize;
+  Offset? _normalPosition;
   static const _titles = ['Progress', 'My Bucket', 'Settings'];
 
   @override
@@ -27,7 +36,9 @@ class _DesktopShellState extends State<DesktopShell> {
   }
 
   Future<void> _registerHotkey() async {
-    final error = await _hotkeyService.register(onPressed: _defineClipboard);
+    final error = await _hotkeyService.register(
+      onPressed: _defineCompactClipboard,
+    );
     if (!mounted || error == null) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Global shortcut unavailable: $error')),
@@ -51,9 +62,60 @@ class _DesktopShellState extends State<DesktopShell> {
     _bucketKey.currentState?.defineClipboard();
   }
 
+  Future<void> _defineCompactClipboard() async {
+    try {
+      final word = await ClipboardCaptureService().readWord();
+      ref.read(lookupProvider.notifier).clear();
+      ref.read(lookupProvider.notifier).lookUp(word);
+      _normalSize ??= await windowManager.getSize();
+      _normalPosition ??= await windowManager.getPosition();
+      if (mounted) setState(() => _compact = true);
+      await windowManager.setAlwaysOnTop(true);
+      await windowManager.setSize(const Size(480, 440));
+      await windowManager.setAlignment(Alignment.topRight);
+      // GNOME 46 may refuse focus without a Wayland activation token, but
+      // show/always-on-top still improves visibility where the compositor
+      // permits it. Do not block clipboard lookup on either request.
+      unawaited(windowManager.show());
+      unawaited(windowManager.focus());
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is ClipboardCaptureException
+                ? error.message
+                : 'Could not open compact Bucketify.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _restoreFullApp() async {
+    if (mounted) setState(() => _compact = false);
+    await windowManager.setAlwaysOnTop(false);
+    if (_normalSize case final size?) await windowManager.setSize(size);
+    if (_normalPosition case final position?) {
+      await windowManager.setPosition(position);
+    }
+  }
+
+  Future<void> _returnToReading() async {
+    await windowManager.setAlwaysOnTop(false);
+    await windowManager.hide();
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_compact) {
+      return CompactDefinitionScreen(
+        onOpenApp: _restoreFullApp,
+        onReturnToReading: _returnToReading,
+      );
+    }
     final wide = MediaQuery.sizeOf(context).width >= 1050;
+    final dueCount = ref.watch(dueWordsProvider).valueOrNull?.length ?? 0;
     return Shortcuts(
       shortcuts: const {
         SingleActivator(LogicalKeyboardKey.keyB, control: true, shift: true):
@@ -106,18 +168,26 @@ class _DesktopShellState extends State<DesktopShell> {
                       ],
                     ),
                   ),
-                  destinations: const [
+                  destinations: [
                     NavigationRailDestination(
-                      icon: Icon(Icons.insights_outlined),
-                      selectedIcon: Icon(Icons.insights_rounded),
+                      icon: Badge(
+                        isLabelVisible: dueCount > 0,
+                        label: Text('$dueCount'),
+                        child: const Icon(Icons.insights_outlined),
+                      ),
+                      selectedIcon: Badge(
+                        isLabelVisible: dueCount > 0,
+                        label: Text('$dueCount'),
+                        child: const Icon(Icons.insights_rounded),
+                      ),
                       label: Text('Progress'),
                     ),
-                    NavigationRailDestination(
+                    const NavigationRailDestination(
                       icon: Icon(Icons.local_library_outlined),
                       selectedIcon: Icon(Icons.local_library_rounded),
                       label: Text('My Bucket'),
                     ),
-                    NavigationRailDestination(
+                    const NavigationRailDestination(
                       icon: Icon(Icons.tune_outlined),
                       selectedIcon: Icon(Icons.tune_rounded),
                       label: Text('Settings'),
@@ -166,12 +236,7 @@ class _DesktopShellState extends State<DesktopShell> {
                             child: IndexedStack(
                               index: _selectedIndex,
                               children: [
-                                const _PlaceholderPage(
-                                  icon: Icons.insights_rounded,
-                                  title: 'Learning progress',
-                                  message:
-                                      'Review insights will be connected next.',
-                                ),
+                                const ProgressScreen(),
                                 BucketScreen(key: _bucketKey),
                                 const _PlaceholderPage(
                                   icon: Icons.tune_rounded,

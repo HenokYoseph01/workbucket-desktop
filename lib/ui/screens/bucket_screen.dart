@@ -5,10 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 
 import '../../data/database/word_dao.dart';
+import '../../data/database/database.dart';
 import '../../data/models/word_model.dart';
 import '../../data/services/clipboard_capture_service.dart';
 import '../../providers/word_provider.dart';
 import '../widgets/word_details.dart';
+import 'review_screen.dart';
 
 class BucketScreen extends ConsumerStatefulWidget {
   const BucketScreen({super.key});
@@ -112,10 +114,21 @@ class BucketScreenState extends ConsumerState<BucketScreen> {
     }
   }
 
+  Future<void> _startReview(List<SavedWord> dueWords) async {
+    final message = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => ReviewScreen(words: dueWords)),
+    );
+    if (!mounted || message == null) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final words = ref.watch(savedWordsProvider);
     final lookup = ref.watch(lookupProvider);
+    final dueWords = ref.watch(dueWordsProvider);
     final previewWord = lookup.result ?? _selectedWord;
     final wide = MediaQuery.sizeOf(context).width >= 980;
 
@@ -190,6 +203,28 @@ class BucketScreenState extends ConsumerState<BucketScreen> {
                       ),
                     ),
                   ],
+                  dueWords.when(
+                    data: (items) => items.isEmpty
+                        ? const SizedBox.shrink()
+                        : Card(
+                            margin: const EdgeInsets.only(top: 16),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primaryContainer,
+                            child: ListTile(
+                              leading: const Icon(Icons.auto_stories_rounded),
+                              title: Text(
+                                '${items.length} ${items.length == 1 ? 'word is' : 'words are'} ready to revisit',
+                              ),
+                              trailing: FilledButton(
+                                onPressed: () => _startReview(items),
+                                child: const Text('Start review'),
+                              ),
+                            ),
+                          ),
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, _) => const SizedBox.shrink(),
+                  ),
                   const SizedBox(height: 24),
                   Row(
                     children: [

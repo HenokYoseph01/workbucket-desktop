@@ -16,6 +16,140 @@ final savedWordsProvider = StreamProvider<List<SavedWord>>(
   (ref) => ref.watch(databaseProvider).watchAllWords(),
 );
 
+final dueWordsProvider = FutureProvider<List<SavedWord>>(
+  (ref) => ref.watch(databaseProvider).getWordsDueForReview(),
+);
+
+enum MasteryLevel { newWord, learning, strong, needsPractice }
+
+class WordMastery {
+  const WordMastery(this.word, this.attempts, this.remembered, this.level);
+  final SavedWord word;
+  final int attempts;
+  final int remembered;
+  final MasteryLevel level;
+  double get recallRate => attempts == 0 ? 0 : remembered / attempts;
+}
+
+class DailyActivity {
+  const DailyActivity(this.date, this.reviews, this.remembered);
+  final DateTime date;
+  final int reviews;
+  final int remembered;
+}
+
+class ReviewStatistics {
+  const ReviewStatistics({
+    required this.totalWords,
+    required this.dueWords,
+    required this.totalReviews,
+    required this.rememberedReviews,
+    required this.currentStreak,
+    required this.longestStreak,
+    required this.mastery,
+    required this.activity,
+    required this.upcoming,
+  });
+  final int totalWords;
+  final int dueWords;
+  final int totalReviews;
+  final int rememberedReviews;
+  final int currentStreak;
+  final int longestStreak;
+  final List<WordMastery> mastery;
+  final List<DailyActivity> activity;
+  final List<SavedWord> upcoming;
+  double get recallRate =>
+      totalReviews == 0 ? 0 : rememberedReviews / totalReviews;
+  int count(MasteryLevel level) =>
+      mastery.where((item) => item.level == level).length;
+  List<WordMastery> get strongest =>
+      (mastery.where((item) => item.level == MasteryLevel.strong).toList()
+            ..sort((a, b) => b.recallRate.compareTo(a.recallRate)))
+          .take(5)
+          .toList();
+  List<WordMastery> get weakest =>
+      (mastery
+              .where((item) => item.level == MasteryLevel.needsPractice)
+              .toList()
+            ..sort((a, b) => a.recallRate.compareTo(b.recallRate)))
+          .take(5)
+          .toList();
+}
+
+final reviewStatisticsProvider = FutureProvider<ReviewStatistics>((ref) async {
+  final database = ref.watch(databaseProvider);
+  final words = await database.getAllWords();
+  final due = await database.getWordsDueForReview();
+  final history = await database.getReviewHistory();
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final mastery = words.map((word) {
+    final attempts = history.where((item) => item.word == word.word).toList();
+    final remembered = attempts.where((item) => item.remembered).length;
+    final rate = attempts.isEmpty ? 0.0 : remembered / attempts.length;
+    final level = attempts.length < 2
+        ? MasteryLevel.newWord
+        : rate < .5
+        ? MasteryLevel.needsPractice
+        : attempts.length >= 3 && rate >= .8
+        ? MasteryLevel.strong
+        : MasteryLevel.learning;
+    return WordMastery(word, attempts.length, remembered, level);
+  }).toList();
+  final days = history
+      .map(
+        (item) => DateTime(
+          item.reviewedAt.year,
+          item.reviewedAt.month,
+          item.reviewedAt.day,
+        ),
+      )
+      .toSet();
+  var cursor = days.contains(today)
+      ? today
+      : today.subtract(const Duration(days: 1));
+  var current = 0;
+  while (days.contains(cursor)) {
+    current++;
+    cursor = cursor.subtract(const Duration(days: 1));
+  }
+  final sortedDays = days.toList()..sort();
+  var longest = sortedDays.isEmpty ? 0 : 1;
+  var run = longest;
+  for (var i = 1; i < sortedDays.length; i++) {
+    run = sortedDays[i].difference(sortedDays[i - 1]).inDays == 1 ? run + 1 : 1;
+    if (run > longest) longest = run;
+  }
+  final activity = List.generate(7, (index) {
+    final day = today.subtract(Duration(days: 6 - index));
+    final next = day.add(const Duration(days: 1));
+    final attempts = history.where(
+      (item) =>
+          !item.reviewedAt.isBefore(day) && item.reviewedAt.isBefore(next),
+    );
+    return DailyActivity(
+      day,
+      attempts.length,
+      attempts.where((item) => item.remembered).length,
+    );
+  });
+  final upcoming =
+      words.where((word) => word.nextReviewAt?.isAfter(now) ?? false).toList()
+        ..sort((a, b) => a.nextReviewAt!.compareTo(b.nextReviewAt!));
+  return ReviewStatistics(
+    totalWords: words.length,
+    dueWords: due.length,
+    totalReviews: history.length,
+    rememberedReviews: history.where((item) => item.remembered).length,
+    currentStreak: current,
+    longestStreak: longest,
+    mastery: mastery,
+    activity: activity,
+    upcoming: upcoming.take(5).toList(),
+  );
+});
+
 final wordSuggestionServiceProvider = Provider(
   (ref) => WordSuggestionService(),
 );
