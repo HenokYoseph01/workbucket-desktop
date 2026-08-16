@@ -33,7 +33,11 @@ class CompactDefinitionScreen extends ConsumerWidget {
                       color: Theme.of(context).colorScheme.tertiary,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.local_library_rounded, size: 20),
+                    child: Icon(
+                      Icons.local_library_rounded,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.onTertiary,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   const Expanded(

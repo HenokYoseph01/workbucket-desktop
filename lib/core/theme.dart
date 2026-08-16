@@ -67,21 +67,50 @@ extension AppPaletteDetails on AppPalette {
 ThemeData buildDesktopTheme(AppPalette palette, Brightness brightness) {
   final dark = brightness == Brightness.dark;
   final paper = dark ? palette.darkPaper : palette.lightPaper;
+  final seedForeground =
+      ThemeData.estimateBrightnessForColor(palette.seed) == Brightness.dark
+      ? Colors.white
+      : Colors.black;
+  final accentForeground =
+      ThemeData.estimateBrightnessForColor(palette.accent) == Brightness.dark
+      ? Colors.white
+      : Colors.black;
   var scheme = ColorScheme.fromSeed(
     seedColor: palette.seed,
     brightness: brightness,
     surface: paper,
   );
-  if (palette == AppPalette.monochromePaper) {
-    scheme = scheme.copyWith(
-      primary: dark ? Colors.white : Colors.black,
-      onPrimary: dark ? Colors.black : Colors.white,
-    );
-  }
+  final primary = palette == AppPalette.monochromePaper
+      ? (dark ? Colors.white : Colors.black)
+      : palette.seed;
+  final onPrimary = palette == AppPalette.monochromePaper
+      ? (dark ? Colors.black : Colors.white)
+      : seedForeground;
+  final primaryContainer = Color.alphaBlend(
+    primary.withValues(alpha: dark ? .24 : .13),
+    paper,
+  );
+  final accentContainer = Color.alphaBlend(
+    palette.accent.withValues(alpha: dark ? .25 : .22),
+    paper,
+  );
+  scheme = scheme.copyWith(
+    primary: primary,
+    onPrimary: onPrimary,
+    primaryContainer: primaryContainer,
+    onPrimaryContainer: scheme.onSurface,
+    secondary: palette.accent,
+    onSecondary: accentForeground,
+    secondaryContainer: accentContainer,
+    onSecondaryContainer: scheme.onSurface,
+    tertiary: palette.accent,
+    onTertiary: accentForeground,
+    tertiaryContainer: accentContainer,
+    onTertiaryContainer: scheme.onSurface,
+    surface: paper,
+  );
   final raised = Color.alphaBlend(
-    dark
-        ? scheme.primary.withValues(alpha: .08)
-        : Colors.white.withValues(alpha: .72),
+    scheme.primary.withValues(alpha: dark ? .09 : .045),
     paper,
   );
   return ThemeData(
@@ -99,13 +128,7 @@ ThemeData buildDesktopTheme(AppPalette palette, Brightness brightness) {
     navigationRailTheme: NavigationRailThemeData(
       backgroundColor: palette.seed,
       indicatorColor: palette.accent,
-      selectedIconTheme: IconThemeData(
-        color:
-            ThemeData.estimateBrightnessForColor(palette.accent) ==
-                Brightness.dark
-            ? Colors.white
-            : Colors.black,
-      ),
+      selectedIconTheme: IconThemeData(color: accentForeground),
       unselectedIconTheme: const IconThemeData(color: Colors.white70),
       selectedLabelTextStyle: const TextStyle(
         color: Colors.white,

@@ -152,7 +152,10 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                             color: Theme.of(context).colorScheme.tertiary,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(Icons.local_library_rounded),
+                          child: Icon(
+                            Icons.local_library_rounded,
+                            color: Theme.of(context).colorScheme.onTertiary,
+                          ),
                         ),
                         if (wide) ...[
                           const SizedBox(width: 12),
